@@ -1,58 +1,46 @@
-import { createClient, RedisClientType } from 'redis';
+import { createClient } from 'redis';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 
+const istemci = createClient({ url: config.redis.url });
+
+istemci.on('error', (hata: any) => logger.error('Redis hatası:', hata));
+istemci.on('connect', () => logger.info('Redis bağlantısı kuruldu'));
+
 class RedisIstemci {
-  private istemci: RedisClientType;
-  private bagli: boolean = false;
-
-  constructor() {
-    this.istemci = createClient({ url: config.redis.url }) as RedisClientType;
-
-    this.istemci.on('error', (hata) => logger.error('Redis hatası:', hata));
-    this.istemci.on('connect', () => {
-      this.bagli = true;
-      logger.info('Redis bağlantısı kuruldu');
-    });
-    this.istemci.on('disconnect', () => {
-      this.bagli = false;
-      logger.warn('Redis bağlantısı kesildi');
-    });
-  }
-
   async baglan(): Promise<void> {
-    if (!this.bagli) {
-      await this.istemci.connect();
+    if (!istemci.isOpen) {
+      await istemci.connect();
     }
   }
 
   async al(anahtar: string): Promise<string | null> {
-    return await this.istemci.get(anahtar);
+    return await istemci.get(anahtar);
   }
 
   async kaydet(anahtar: string, deger: string, ttlSaniye?: number): Promise<void> {
     if (ttlSaniye) {
-      await this.istemci.setEx(anahtar, ttlSaniye, deger);
+      await istemci.setEx(anahtar, ttlSaniye, deger);
     } else {
-      await this.istemci.set(anahtar, deger);
+      await istemci.set(anahtar, deger);
     }
   }
 
   async sil(anahtar: string): Promise<void> {
-    await this.istemci.del(anahtar);
+    await istemci.del(anahtar);
   }
 
   async artir(anahtar: string): Promise<number> {
-    return await this.istemci.incr(anahtar);
+    return await istemci.incr(anahtar);
   }
 
   async ttlAyarla(anahtar: string, saniye: number): Promise<void> {
-    await this.istemci.expire(anahtar, saniye);
+    await istemci.expire(anahtar, saniye);
   }
 
   async saglik(): Promise<boolean> {
     try {
-      await this.istemci.ping();
+      await istemci.ping();
       return true;
     } catch {
       return false;
