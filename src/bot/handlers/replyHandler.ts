@@ -1,4 +1,5 @@
 import TelegramBot from 'node-telegram-bot-api';
+import * as awaitingState from '../utils/awaitingState';
 import { gorevService } from '../../services/gorevService';
 import { bugService } from '../../services/bugService';
 import { claudeSor } from '../../integrations/claudeAI';
@@ -12,6 +13,9 @@ export function replyHandleriniKaydet(bot: TelegramBot): void {
   bot.on('message', async (mesaj) => {
     if (!mesaj.text || !mesaj.reply_to_message) return;
     if (mesaj.text.startsWith('/')) return;
+    const chatId = mesaj.chat.id;
+    const userId = mesaj.from?.id;
+    if (userId && awaitingState.get(chatId, userId)) return; // Metin girişi bekleniyorsa reply işleme
 
     const metin = mesaj.text.trim().toLowerCase();
     const hedefMesaj = mesaj.reply_to_message;

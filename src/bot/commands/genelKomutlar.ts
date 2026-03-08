@@ -10,6 +10,7 @@ import { standupGetir, standupBugunTumunuGetir } from '../../jobs/gunlukRapor';
 import { nobetService } from '../../services/nobetService';
 import { issueOlustur } from '../../services/githubService';
 import { adminMi } from '../middlewares/auth';
+import * as awaitingState from '../utils/awaitingState';
 import { logger } from '../../utils/logger';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -61,7 +62,8 @@ const MENU_KEYBOARDS: Record<string, { metin: string; klavye: TelegramBot.Inline
   diger: {
     metin: `🛠 *UstaGo Panel*\n\n📋 *Diğer*`,
     klavye: [
-      [{ text: '☀️ Bugün Ne Var?', callback_data: 'cmd:bugun_ne_var' }, { text: '📋 Standup', callback_data: 'cmd:standup' }],
+      [{ text: '☀️ Bugün Ne Var?', callback_data: 'cmd:bugun_ne_var' }],
+      [{ text: '📋 Standup plan', callback_data: 'cmd:standup_plan' }, { text: '✓ Standup bitti', callback_data: 'cmd:standup_bitti' }, { text: '👀 Standup görüntüle', callback_data: 'cmd:standup' }],
       [{ text: '📝 Changelog', callback_data: 'cmd:changelog' }, { text: '🔄 Retro', callback_data: 'cmd:retro' }],
       [{ text: '🖥 Servisler', callback_data: 'cmd:servisler' }, { text: '👮 Nöbet', callback_data: 'cmd:nobet' }],
       [{ text: '← Ana menü', callback_data: 'menu:main' }],
@@ -165,26 +167,55 @@ export function genelKomutlariniKaydet(bot: TelegramBot): void {
           break;
         }
         case 'gorev_ekle':
-          await bot.sendMessage(chatId, '📝 Görev eklemek için:\n`/gorev ekle <metin>`\n`/gorev dogal Yarın Login düzelt` (AI parse)\n\nVeya mesaja yanıt verip `gorev` yazın.', { parse_mode: 'Markdown' });
+          if (userId) {
+            awaitingState.set(chatId, userId, 'gorev_ekle');
+            await bot.sendMessage(chatId, '📝 *Görev metnini yazın:*\n\n_İptal için /iptal_', { parse_mode: 'Markdown' });
+          }
           break;
         case 'gorev_bitir':
-          await bot.sendMessage(chatId, '✓ Görev bitirmek için:\n`/gorev bitir <id>`\n\nÖrn: `/gorev bitir 3`', { parse_mode: 'Markdown' });
+          if (userId) {
+            awaitingState.set(chatId, userId, 'gorev_bitir');
+            await bot.sendMessage(chatId, '✓ *Tamamlanacak görev ID\'sini yazın:*\n\nÖrn: 3\n_İptal için /iptal_', { parse_mode: 'Markdown' });
+          }
           break;
         case 'gorev_sil':
-          await bot.sendMessage(chatId, '🗑 Görev silmek için:\n`/gorev sil <id>`\n\nÖrn: `/gorev sil 3`', { parse_mode: 'Markdown' });
+          if (userId) {
+            awaitingState.set(chatId, userId, 'gorev_sil');
+            await bot.sendMessage(chatId, '🗑 *Silinecek görev ID\'sini yazın:*\n\nÖrn: 3\n_İptal için /iptal_', { parse_mode: 'Markdown' });
+          }
           break;
         case 'bug':
-          await bot.sendMessage(chatId, '🐞 Bug raporlamak için:\n`/bug <açıklama>`\n\nÖrn: `/bug Login iOS\'ta çalışmıyor`', { parse_mode: 'Markdown' });
+          if (userId) {
+            awaitingState.set(chatId, userId, 'bug');
+            await bot.sendMessage(chatId, '🐞 *Bug açıklamasını yazın:*\n\n_İptal için /iptal_', { parse_mode: 'Markdown' });
+          }
           break;
         case 'ai':
-          await bot.sendMessage(chatId, '🤖 AI\'ya sormak için:\n`/ai <soru>`\n\nÖrn: `/ai Redis nasıl kullanılır?`', { parse_mode: 'Markdown' });
+          if (userId) {
+            awaitingState.set(chatId, userId, 'ai');
+            await bot.sendMessage(chatId, '🤖 *Sorunuzu yazın:*\n\n_İptal için /iptal_', { parse_mode: 'Markdown' });
+          }
           break;
         case 'sinyal_long':
-        case 'sinyal_short': {
-          const yon = cmd === 'sinyal_long' ? 'LONG' : 'SHORT';
-          await bot.sendMessage(chatId, `📈 Sinyal göndermek için:\n\`/sinyal ${yon} <sembol>\`\n\nÖrn: \`/sinyal ${yon} BTC\``, { parse_mode: 'Markdown' });
+        case 'sinyal_short':
+          if (userId) {
+            awaitingState.set(chatId, userId, cmd as 'sinyal_long' | 'sinyal_short');
+            const yon = cmd === 'sinyal_long' ? 'LONG' : 'SHORT';
+            await bot.sendMessage(chatId, `📈 *${yon} için sembol yazın:*\n\nÖrn: BTC, ETH\n_İptal için /iptal_`, { parse_mode: 'Markdown' });
+          }
           break;
-        }
+        case 'standup_plan':
+          if (userId) {
+            awaitingState.set(chatId, userId, 'standup_plan');
+            await bot.sendMessage(chatId, '📋 *Bugün ne yapacaksınız? Planınızı yazın:*\n\n_İptal için /iptal_', { parse_mode: 'Markdown' });
+          }
+          break;
+        case 'standup_bitti':
+          if (userId) {
+            awaitingState.set(chatId, userId, 'standup_bitti');
+            await bot.sendMessage(chatId, '✓ *Ne tamamladınız? Yazın:*\n\n_İptal için /iptal_', { parse_mode: 'Markdown' });
+          }
+          break;
         case 'standup': {
           const mevcut = userId ? standupGetir(userId) : null;
           if (mevcut) {
