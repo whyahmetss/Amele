@@ -7,13 +7,11 @@ class Veritabani {
 
   constructor() {
     this.pool = new Pool({
-      ...config.db,
+      connectionString: config.db.url,
+      ssl: { rejectUnauthorized: false },
       max: 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
-      ssl: {
-    rejectUnauthorized: false // Supabase bağlantısı için bu şart kanka
-  }
     });
 
     this.pool.on('error', (hata) => {
