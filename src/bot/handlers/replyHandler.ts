@@ -18,12 +18,12 @@ export function replyHandleriniKaydet(bot: TelegramBot): void {
     if (userId && awaitingState.get(chatId, userId)) return; // Metin girişi bekleniyorsa reply işleme
 
     const metin = mesaj.text.trim().toLowerCase();
-    const hedefMesaj = mesaj.reply_to_message;
 
-    if (!hedefMesaj.text) {
-      bot.sendMessage(mesaj.chat.id, '⚠️ Yanıt verdiğiniz mesaj metin içermiyor.');
-      return;
-    }
+    // Sadece "gorev" veya "bug" yazıldığında tepki ver
+    if (metin !== 'gorev' && metin !== 'bug') return;
+
+    const hedefMesaj = mesaj.reply_to_message;
+    if (!hedefMesaj.text) return; // Sessizce geç
 
     const ad = mesaj.from?.first_name || 'Bilinmeyen';
     const id = mesaj.from?.id || 0;

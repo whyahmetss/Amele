@@ -7,12 +7,29 @@ CREATE TABLE IF NOT EXISTS gorevler (
   id          SERIAL PRIMARY KEY,
   metin       TEXT NOT NULL,
   durum       VARCHAR(20) DEFAULT 'bekliyor' CHECK (durum IN ('bekliyor', 'devam', 'tamamlandi')),
+  oncelik     VARCHAR(10) DEFAULT 'orta' CHECK (oncelik IN ('dusuk', 'orta', 'yuksek', 'kritik')),
+  etiketler   TEXT[] DEFAULT '{}',
+  kategori    VARCHAR(50),
+  atanan_id   BIGINT,
+  atanan_ad   VARCHAR(100),
   ekleyen_id  BIGINT NOT NULL,
   ekleyen_ad  VARCHAR(100),
+  github_issue_url TEXT,
   olusturuldu TIMESTAMPTZ DEFAULT NOW(),
   tamamlandi  TIMESTAMPTZ,
   CONSTRAINT metin_bos_degil CHECK (LENGTH(TRIM(metin)) > 0)
 );
+
+-- Yeni sütunları güvenli şekilde ekle (zaten varsa hata vermez)
+DO $$ BEGIN
+  ALTER TABLE gorevler ADD COLUMN IF NOT EXISTS oncelik VARCHAR(10) DEFAULT 'orta';
+  ALTER TABLE gorevler ADD COLUMN IF NOT EXISTS etiketler TEXT[] DEFAULT '{}';
+  ALTER TABLE gorevler ADD COLUMN IF NOT EXISTS kategori VARCHAR(50);
+  ALTER TABLE gorevler ADD COLUMN IF NOT EXISTS atanan_id BIGINT;
+  ALTER TABLE gorevler ADD COLUMN IF NOT EXISTS atanan_ad VARCHAR(100);
+  ALTER TABLE gorevler ADD COLUMN IF NOT EXISTS github_issue_url TEXT;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
 
 -- Deploy geçmişi tablosu
 CREATE TABLE IF NOT EXISTS deployler (
@@ -71,6 +88,28 @@ CREATE TABLE IF NOT EXISTS nobet_takvimi (
   olusturuldu   TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_nobet_tarih ON nobet_takvimi(tarih);
+
+-- Audit log tablosu
+CREATE TABLE IF NOT EXISTS audit_log (
+  id          SERIAL PRIMARY KEY,
+  kullanici_id BIGINT NOT NULL,
+  kullanici_ad VARCHAR(100),
+  islem       VARCHAR(50) NOT NULL,
+  detay       TEXT,
+  hedef_tip   VARCHAR(30),
+  hedef_id    INTEGER,
+  olusturuldu TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_audit_tarih ON audit_log(olusturuldu DESC);
+
+-- Webhook ayarları tablosu
+CREATE TABLE IF NOT EXISTS webhooklar (
+  id          SERIAL PRIMARY KEY,
+  url         TEXT NOT NULL,
+  olaylar     TEXT[] DEFAULT '{gorev_eklendi,gorev_bitti,bug_eklendi}',
+  aktif       BOOLEAN DEFAULT true,
+  olusturuldu TIMESTAMPTZ DEFAULT NOW()
+);
 `;
 
 async function migrate() {

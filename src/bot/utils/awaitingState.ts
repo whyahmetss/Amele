@@ -1,8 +1,4 @@
-/**
- * Kullanıcının "metin girişi bekleniyor" durumunu tutar.
- * Butona basınca → "Görev metnini yaz" → kullanıcı yazar → işlem yapılır.
- */
-type AwaitingAction = 'gorev_ekle' | 'gorev_bitir' | 'gorev_sil' | 'bug' | 'ai' | 'standup_plan' | 'standup_bitti' | 'sinyal_long' | 'sinyal_short';
+type AwaitingAction = string; // Açık tip: gorev_ekle, gorev_ata_5, sablon_0, webhook_ekle vb.
 
 const store = new Map<string, { action: AwaitingAction }>();
 
