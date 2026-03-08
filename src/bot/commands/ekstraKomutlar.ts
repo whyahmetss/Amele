@@ -84,6 +84,41 @@ export function ekstraKomutlariniKaydet(bot: TelegramBot): void {
     }
   });
 
+  // /retro - Sprint retrospektifi
+  bot.onText(/^\/retro/i, async (mesaj) => {
+    bot.sendMessage(mesaj.chat.id, '🔄 Retrospektif hazırlanıyor...');
+    try {
+      const [gorevler, buglar, deployler] = await Promise.all([
+        db.query(`SELECT metin, tamamlandi, ekleyen_ad FROM gorevler WHERE tamamlandi >= NOW() - INTERVAL '7 days'`),
+        db.query(`SELECT aciklama, durum, bildiren_ad FROM bug_raporlari WHERE olusturuldu >= NOW() - INTERVAL '7 days'`),
+        db.query(`SELECT commit_msg, yapan FROM deployler WHERE olusturuldu >= NOW() - INTERVAL '7 days' LIMIT 10`),
+      ]);
+
+      const ozet = [
+        '**Tamamlanan görevler:**',
+        gorevler.rows.map((r: any) => `- ${r.metin} (${r.ekleyen_ad})`).join('\n') || '-',
+        '\n**Buglar:**',
+        buglar.rows.map((r: any) => `- ${r.aciklama} [${r.durum}]`).join('\n') || '-',
+        '\n**Son deploylar:**',
+        deployler.rows.map((r: any) => `- ${r.commit_msg}`).join('\n') || '-',
+      ].join('\n');
+
+      const analiz = await claudeSor(
+        `Aşağıdaki son 1 haftalık sprint verisini analiz et. Retrospektif formatında yanıt ver:\n\n` +
+        `1. Ne iyi gitti?\n2. Ne geliştirilebilir?\n3. Bir sonraki sprint için 2-3 aksiyon öner.\n\nKısa ve net ol.\n\nVeri:\n${ozet}`
+      );
+
+      bot.sendMessage(
+        mesaj.chat.id,
+        `📋 *Sprint Retrospektifi*\n━━━━━━━━━━━━━━━━━━━━━━\n\n${analiz}`,
+        { parse_mode: 'Markdown' }
+      );
+    } catch (hata) {
+      logger.error('Retro hatası:', hata);
+      bot.sendMessage(mesaj.chat.id, '❌ Retrospektif oluşturulamadı.');
+    }
+  });
+
   // /servisler - manuel servis durumu
   bot.onText(/^\/servisler/i, async (mesaj) => {
     const servisler = servisleriGetir();

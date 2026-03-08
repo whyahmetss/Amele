@@ -1,8 +1,33 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { gorevService } from '../../services/gorevService';
 import { logger } from '../../utils/logger';
+import { config } from '../../config';
 
 export function gorevKomutlariniKaydet(bot: TelegramBot): void {
+
+  // /gorev dogal "Yarın Login API düzelt" - AI parse edip görev oluşturur
+  bot.onText(/^\/gorev dogal (.+)/i, async (mesaj, eslesme) => {
+    const metin = eslesme?.[1]?.trim();
+    const ad = mesaj.from?.first_name || 'Bilinmeyen';
+    const id = mesaj.from?.id || 0;
+    if (!metin) {
+      bot.sendMessage(mesaj.chat.id, '⚠️ Kullanım: `/gorev dogal Yarın Login API düzelt`', { parse_mode: 'Markdown' });
+      return;
+    }
+    try {
+      const { claudeSor } = await import('../../integrations/claudeAI');
+      const gorevMetni = await claudeSor(
+        `Aşağıdaki metni TEK BİR GÖREV metnine dönüştür. Sadece görev metnini yaz, başka hiçbir şey yazma. Tarih/zaman bilgisini atla.
+Örnek: "Yarın sabah Login sayfasını düzelt" → "Login sayfasını düzelt"
+Metin: "${metin}"`
+      );
+      const gorev = await gorevService.ekle(gorevMetni.trim(), id, ad);
+      bot.sendMessage(mesaj.chat.id, `✅ *Görev eklendi* #${gorev.id}\n\n📌 ${gorev.metin}\n👤 ${ad}`, { parse_mode: 'Markdown' });
+    } catch (hata) {
+      logger.error('Doğal dil görev hatası:', hata);
+      bot.sendMessage(mesaj.chat.id, '❌ Görev oluşturulamadı.');
+    }
+  });
 
   // /gorev ekle <metin>
   bot.onText(/^\/gorev ekle (.+)/i, async (mesaj, eslesme) => {
@@ -17,10 +42,16 @@ export function gorevKomutlariniKaydet(bot: TelegramBot): void {
 
     try {
       const gorev = await gorevService.ekle(metin, id, ad);
+      const opts: TelegramBot.SendMessageOptions = { parse_mode: 'Markdown' };
+      if (config.github.token && config.github.repo) {
+        opts.reply_markup = {
+          inline_keyboard: [[{ text: "🔗 GitHub'a Gönder", callback_data: `github:gorev:${gorev.id}` }]],
+        };
+      }
       bot.sendMessage(
         mesaj.chat.id,
         `✅ *Görev eklendi* #${gorev.id}\n\n📌 ${gorev.metin}\n👤 ${ad}`,
-        { parse_mode: 'Markdown' }
+        opts
       );
     } catch (hata) {
       logger.error('Görev ekleme hatası:', hata);

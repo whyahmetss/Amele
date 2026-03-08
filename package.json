@@ -15,15 +15,16 @@
     "@types/node-cron": "^3.0.11",
     "@types/node-telegram-bot-api": "^0.64.0",
     "@types/pg": "^8.10.9",
-    "node-telegram-bot-api": "^0.64.0",
-    "express": "^4.18.2",
-    "pg": "^8.11.3",
-    "redis": "^4.6.10",
     "axios": "^1.6.2",
     "dotenv": "^16.3.1",
-    "winston": "^3.11.0",
+    "express": "^4.18.2",
+    "form-data": "^4.0.5",
     "node-cron": "^3.0.3",
+    "node-telegram-bot-api": "^0.64.0",
+    "pg": "^8.11.3",
+    "redis": "^4.6.10",
+    "ts-node": "^10.9.2",
     "typescript": "^5.3.2",
-    "ts-node": "^10.9.2"
+    "winston": "^3.11.0"
   }
 }

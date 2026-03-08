@@ -19,6 +19,10 @@ export const config = {
   github: {
     webhookSecret: process.env.GITHUB_WEBHOOK_SECRET || '',
     repo: process.env.GITHUB_REPO || '',
+    token: process.env.GITHUB_TOKEN || '',
+  },
+  openai: {
+    apiKey: process.env.OPENAI_API_KEY || '', // Sesli mesaj (Whisper) için
   },
   server: {
     port: Number(process.env.SERVER_PORT) || 3000,

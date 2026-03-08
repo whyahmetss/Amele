@@ -59,7 +59,13 @@ Bug: "${aciklama}"`
         `${seviye}\n\n` +
         `🤖 *AI Analizi:*\n${analiz}`;
 
-      bot.sendMessage(mesaj.chat.id, mesajMetni, { parse_mode: 'Markdown' });
+      const opts: TelegramBot.SendMessageOptions = { parse_mode: 'Markdown' };
+      if (config.github.token && config.github.repo) {
+        opts.reply_markup = {
+          inline_keyboard: [[{ text: "🔗 GitHub'a Gönder", callback_data: `github:bug:${bug.id}` }]],
+        };
+      }
+      bot.sendMessage(mesaj.chat.id, mesajMetni, opts);
 
       // KRİTİK ise adminleri mention et
       if (analiz.includes('KRİTİK')) {
