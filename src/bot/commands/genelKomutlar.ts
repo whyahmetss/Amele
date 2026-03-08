@@ -17,50 +17,28 @@ import { promisify } from 'util';
 const execAsync = promisify(exec);
 
 const YARDIM_METNI =
-  `🛠️ *UstaGo Geliştirici Bot*\n` +
-  `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-  `Komutlar için aşağıdaki butonları kullanabilirsiniz.\n\n` +
-  `━━━━━━━━━━━━━━━━━━━━━━\n` +
-  `_UstaGo v1.0 · Türkçe_`;
+  `🛠 *UstaGo Panel*\n\n` +
+  `📋 *Görevler*\n` +
+  `   ├ Görev ekle\n` +
+  `   ├ Görev liste\n` +
+  `   └ Görev bitir\n\n` +
+  `🖥 *Sunucu*\n` +
+  `   ├ CPU / RAM\n` +
+  `   ├ Log çek\n` +
+  `   ├ Restart\n` +
+  `   └ Deploy`;
 
 const INLINE_KEYBOARD: TelegramBot.InlineKeyboardButton[][] = [
   [
-    { text: '☀️ Bugün Ne Var?', callback_data: 'cmd:bugun_ne_var' },
+    { text: '📋 Görev ekle', callback_data: 'cmd:gorev_ekle' },
+    { text: 'Görev liste', callback_data: 'cmd:gorev_liste' },
+    { text: 'Görev bitir', callback_data: 'cmd:gorev_bitir' },
   ],
   [
-    { text: '📋 Görev Listesi', callback_data: 'cmd:gorev_liste' },
-    { text: '📊 İstatistik', callback_data: 'cmd:gorev_istatistik' },
-  ],
-  [
-    { text: '➕ Görev Ekle', callback_data: 'cmd:gorev_ekle' },
-    { text: '✓ Bitir', callback_data: 'cmd:gorev_bitir' },
-    { text: '🗑 Sil', callback_data: 'cmd:gorev_sil' },
-  ],
-  [
-    { text: '🐞 Bug Raporu', callback_data: 'cmd:bug' },
-    { text: '🤖 AI Sor', callback_data: 'cmd:ai' },
-  ],
-  [
-    { text: '📋 Standup', callback_data: 'cmd:standup' },
-    { text: '📝 Changelog', callback_data: 'cmd:changelog' },
-    { text: '🔄 Retro', callback_data: 'cmd:retro' },
-    { text: '🖥 Servisler', callback_data: 'cmd:servisler' },
-  ],
-  [
-    { text: '👮 Nöbet', callback_data: 'cmd:nobet' },
-  ],
-  [
-    { text: '📈 Sinyal LONG', callback_data: 'cmd:sinyal_long' },
-    { text: '📉 Sinyal SHORT', callback_data: 'cmd:sinyal_short' },
-  ],
-  [
-    { text: '🖥 Durum', callback_data: 'cmd:server_durum' },
-    { text: '💚 Sağlık', callback_data: 'cmd:server_saglik' },
-    { text: '📋 Log', callback_data: 'cmd:server_log' },
-  ],
-  [
-    { text: '♻️ Restart', callback_data: 'cmd:server_restart' },
-    { text: '🚀 Deploy', callback_data: 'cmd:deploy' },
+    { text: '🖥 CPU / RAM', callback_data: 'cmd:server_durum' },
+    { text: 'Log çek', callback_data: 'cmd:server_log' },
+    { text: 'Restart', callback_data: 'cmd:server_restart' },
+    { text: 'Deploy', callback_data: 'cmd:deploy' },
   ],
 ];
 
