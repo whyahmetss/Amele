@@ -7,6 +7,7 @@ import { gorevKomutlariniKaydet } from './commands/gorevKomutlari';
 import { sunucuKomutlariniKaydet } from './commands/sunucuKomutlari';
 import { aiKomutlariniKaydet } from './commands/aiKomutlari';
 import { nobetKomutlariniKaydet } from './commands/nobetKomutlari';
+import { awaitingHandleriniKaydet } from './handlers/awaitingHandler';
 import { isimHandleriniKaydet } from './handlers/isimHandler';
 import { replyHandleriniKaydet } from './handlers/replyHandler';
 import { voiceHandleriniKaydet } from './handlers/voiceHandler';
@@ -25,6 +26,7 @@ export function botOlustur(): TelegramBot {
     await rateLimiter(bot, mesaj);
   });
 
+  awaitingHandleriniKaydet(bot); // Önce - metin girişi bekleyen kullanıcılar için
   genelKomutlariniKaydet(bot);
   gorevKomutlariniKaydet(bot);
   sunucuKomutlariniKaydet(bot);

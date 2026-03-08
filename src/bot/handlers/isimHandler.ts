@@ -1,5 +1,6 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { claudeSor } from '../../integrations/claudeAI';
+import * as awaitingState from '../utils/awaitingState';
 import { logger } from '../../utils/logger';
 
 const TETIKLEYICI_KELIMELER = ['amele', 'amele_bot', '@amele_bot'];
@@ -8,6 +9,9 @@ export function isimHandleriniKaydet(bot: TelegramBot): void {
   bot.on('message', async (mesaj) => {
     if (!mesaj.text) return;
     if (mesaj.text.startsWith('/')) return;
+    const chatId = mesaj.chat.id;
+    const userId = mesaj.from?.id;
+    if (userId && awaitingState.get(chatId, userId)) return; // Metin girişi bekleniyorsa AI'ya gitme
 
     const metin = mesaj.text.toLowerCase();
     const tetiklendi = TETIKLEYICI_KELIMELER.some(k => metin.includes(k));
