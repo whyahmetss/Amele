@@ -3,37 +3,39 @@ import { config } from '../config';
 import { logger } from '../utils/logger';
 
 export async function claudeSor(soru: string): Promise<string> {
-  if (!config.claude.apiKey) {
-    return '⚠️ Claude API anahtarı tanımlanmamış.';
+  if (!config.deepseek.apiKey) {
+    return '⚠️ Deepseek API anahtarı tanımlanmamış.';
   }
 
   try {
     const yanit = await axios.post(
-      'https://api.anthropic.com/v1/messages',
+      'https://api.deepseek.com/chat/completions',
       {
-        model: 'claude-sonnet-4-20250514',
+        model: 'deepseek-chat',
         max_tokens: 1024,
         messages: [
           {
+            role: 'system',
+            content: 'Sen UstaGo projesinin AI asistanısın. Adın Amele. Türkçe, kısa ve net cevap ver. Samimi ve esprili ol.'
+          },
+          {
             role: 'user',
-            content: `Sen UstaGo projesinin AI asistanısın. Türkçe, kısa ve net cevap ver.\n\nSoru: ${soru}`,
+            content: soru,
           },
         ],
       },
       {
         headers: {
-          'x-api-key': config.claude.apiKey,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
+          'Authorization': `Bearer ${config.deepseek.apiKey}`,
+          'Content-Type': 'application/json',
         },
         timeout: 30000,
       }
     );
 
-    const icerik = yanit.data?.content?.[0]?.text;
-    return icerik || '⚠️ Yanıt alınamadı.';
+    return yanit.data?.choices?.[0]?.message?.content || '⚠️ Yanıt alınamadı.';
   } catch (hata: any) {
-    logger.error('Claude API hatası:', hata?.response?.data || hata.message);
+    logger.error('Deepseek API hatası:', hata?.response?.data || hata.message);
     return `⚠️ AI yanıt hatası: ${hata.message}`;
   }
 }
