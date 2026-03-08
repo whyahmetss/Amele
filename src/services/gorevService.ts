@@ -74,6 +74,27 @@ export const gorevService = {
     return { tamamlanan: t, bekleyen: b, buHafta: h, satirlar };
   },
 
+  async exportMarkdown(): Promise<string> {
+    const [aktif, tamamlanan] = await Promise.all([
+      db.query<Gorev>(`SELECT * FROM gorevler WHERE durum != 'tamamlandi' ORDER BY olusturuldu ASC`),
+      db.query<Gorev>(`SELECT * FROM gorevler WHERE durum = 'tamamlandi' AND tamamlandi >= NOW() - INTERVAL '14 days' ORDER BY tamamlandi DESC`),
+    ]);
+    const tarih = new Date().toLocaleString('tr-TR');
+    let md = `# UstaGo Görev Listesi\n`;
+    md += `_Export: ${tarih}_\n\n`;
+    md += `## Aktif (${aktif.rows.length})\n\n`;
+    for (const g of aktif.rows) {
+      const t = new Date(g.olusturuldu).toLocaleDateString('tr-TR');
+      md += `- [ ] **#${g.id}** ${g.metin} — ${g.ekleyen_ad} (${t})\n`;
+    }
+    md += `\n## Tamamlanan (son 14 gün, ${tamamlanan.rows.length})\n\n`;
+    for (const g of tamamlanan.rows) {
+      const t = g.tamamlandi ? new Date(g.tamamlandi).toLocaleDateString('tr-TR') : '-';
+      md += `- [x] **#${g.id}** ${g.metin} — ${g.ekleyen_ad} (${t})\n`;
+    }
+    return md;
+  },
+
   formatListeMesaji(gorevler: Gorev[]): string {
     if (gorevler.length === 0) {
       return '✅ Aktif görev bulunmuyor.';
