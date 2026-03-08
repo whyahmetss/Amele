@@ -16,61 +16,66 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
-const YARDIM_METNI =
-  `🛠️ *UstaGo Geliştirici Bot*\n` +
-  `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-  `Komutlar için aşağıdaki butonları kullanabilirsiniz.\n\n` +
-  `━━━━━━━━━━━━━━━━━━━━━━\n` +
-  `_UstaGo v1.0 · Türkçe_`;
+const MAIN_METIN = `🛠 *UstaGo Panel*\n\nAna menüden bir kategori seçin.`;
 
-const INLINE_KEYBOARD: TelegramBot.InlineKeyboardButton[][] = [
-  [
-    { text: '☀️ Bugün Ne Var?', callback_data: 'cmd:bugun_ne_var' },
-  ],
-  [
-    { text: '📋 Görev Listesi', callback_data: 'cmd:gorev_liste' },
-    { text: '📊 İstatistik', callback_data: 'cmd:gorev_istatistik' },
-  ],
-  [
-    { text: '➕ Görev Ekle', callback_data: 'cmd:gorev_ekle' },
-    { text: '✓ Bitir', callback_data: 'cmd:gorev_bitir' },
-    { text: '🗑 Sil', callback_data: 'cmd:gorev_sil' },
-  ],
-  [
-    { text: '🐞 Bug Raporu', callback_data: 'cmd:bug' },
-    { text: '🤖 AI Sor', callback_data: 'cmd:ai' },
-  ],
-  [
-    { text: '📋 Standup', callback_data: 'cmd:standup' },
-    { text: '📝 Changelog', callback_data: 'cmd:changelog' },
-    { text: '🔄 Retro', callback_data: 'cmd:retro' },
-    { text: '🖥 Servisler', callback_data: 'cmd:servisler' },
-  ],
-  [
-    { text: '👮 Nöbet', callback_data: 'cmd:nobet' },
-  ],
-  [
-    { text: '📈 Sinyal LONG', callback_data: 'cmd:sinyal_long' },
-    { text: '📉 Sinyal SHORT', callback_data: 'cmd:sinyal_short' },
-  ],
-  [
-    { text: '🖥 Durum', callback_data: 'cmd:server_durum' },
-    { text: '💚 Sağlık', callback_data: 'cmd:server_saglik' },
-    { text: '📋 Log', callback_data: 'cmd:server_log' },
-  ],
-  [
-    { text: '♻️ Restart', callback_data: 'cmd:server_restart' },
-    { text: '🚀 Deploy', callback_data: 'cmd:deploy' },
-  ],
+const MAIN_KEYBOARD: TelegramBot.InlineKeyboardButton[][] = [
+  [{ text: '📋 Görevler', callback_data: 'menu:gorevler' }],
+  [{ text: '🖥 Sunucu', callback_data: 'menu:sunucu' }],
+  [{ text: '🐞 Bug & AI', callback_data: 'menu:bugai' }],
+  [{ text: '📈 Sinyal', callback_data: 'menu:sinyal' }],
+  [{ text: '📋 Diğer', callback_data: 'menu:diger' }],
 ];
+
+const MENU_KEYBOARDS: Record<string, { metin: string; klavye: TelegramBot.InlineKeyboardButton[][] }> = {
+  gorevler: {
+    metin: `🛠 *UstaGo Panel*\n\n📋 *Görevler*`,
+    klavye: [
+      [{ text: '➕ Görev ekle', callback_data: 'cmd:gorev_ekle' }, { text: '📋 Görev liste', callback_data: 'cmd:gorev_liste' }],
+      [{ text: '✓ Görev bitir', callback_data: 'cmd:gorev_bitir' }, { text: '🗑 Görev sil', callback_data: 'cmd:gorev_sil' }],
+      [{ text: '📊 İstatistik', callback_data: 'cmd:gorev_istatistik' }],
+      [{ text: '← Ana menü', callback_data: 'menu:main' }],
+    ],
+  },
+  sunucu: {
+    metin: `🛠 *UstaGo Panel*\n\n🖥 *Sunucu*`,
+    klavye: [
+      [{ text: 'CPU / RAM', callback_data: 'cmd:server_durum' }, { text: 'Log çek', callback_data: 'cmd:server_log' }],
+      [{ text: 'Restart', callback_data: 'cmd:server_restart' }, { text: 'Deploy', callback_data: 'cmd:deploy' }],
+      [{ text: '← Ana menü', callback_data: 'menu:main' }],
+    ],
+  },
+  bugai: {
+    metin: `🛠 *UstaGo Panel*\n\n🐞 *Bug & AI*`,
+    klavye: [
+      [{ text: '🐞 Bug Raporu', callback_data: 'cmd:bug' }, { text: '🤖 AI Sor', callback_data: 'cmd:ai' }],
+      [{ text: '← Ana menü', callback_data: 'menu:main' }],
+    ],
+  },
+  sinyal: {
+    metin: `🛠 *UstaGo Panel*\n\n📈 *Sinyal*`,
+    klavye: [
+      [{ text: '📈 Sinyal LONG', callback_data: 'cmd:sinyal_long' }, { text: '📉 Sinyal SHORT', callback_data: 'cmd:sinyal_short' }],
+      [{ text: '← Ana menü', callback_data: 'menu:main' }],
+    ],
+  },
+  diger: {
+    metin: `🛠 *UstaGo Panel*\n\n📋 *Diğer*`,
+    klavye: [
+      [{ text: '☀️ Bugün Ne Var?', callback_data: 'cmd:bugun_ne_var' }, { text: '📋 Standup', callback_data: 'cmd:standup' }],
+      [{ text: '📝 Changelog', callback_data: 'cmd:changelog' }, { text: '🔄 Retro', callback_data: 'cmd:retro' }],
+      [{ text: '🖥 Servisler', callback_data: 'cmd:servisler' }, { text: '👮 Nöbet', callback_data: 'cmd:nobet' }],
+      [{ text: '← Ana menü', callback_data: 'menu:main' }],
+    ],
+  },
+};
 
 export function genelKomutlariniKaydet(bot: TelegramBot): void {
 
   // /start veya /yardim
   bot.onText(/^\/(start|yardim)/i, (mesaj) => {
-    bot.sendMessage(mesaj.chat.id, YARDIM_METNI, {
+    bot.sendMessage(mesaj.chat.id, MAIN_METIN, {
       parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: INLINE_KEYBOARD },
+      reply_markup: { inline_keyboard: MAIN_KEYBOARD },
     });
   });
 
@@ -109,6 +114,32 @@ export function genelKomutlariniKaydet(bot: TelegramBot): void {
       } catch (hata) {
         logger.error('GitHub buton hatası:', hata);
         await bot.sendMessage(chatId, '❌ GitHub issue oluşturulamadı.');
+      }
+      return;
+    }
+
+    // Alt menü aç (menu:gorevler, menu:sunucu vs.)
+    if (data.startsWith('menu:')) {
+      const menu = data.replace('menu:', '');
+      const msgId = callback.message?.message_id;
+      if (!msgId) return;
+      if (menu === 'main') {
+        await bot.editMessageText(MAIN_METIN, {
+          chat_id: chatId,
+          message_id: msgId,
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: MAIN_KEYBOARD },
+        });
+      } else {
+        const m = MENU_KEYBOARDS[menu];
+        if (m) {
+          await bot.editMessageText(m.metin, {
+            chat_id: chatId,
+            message_id: msgId,
+            parse_mode: 'Markdown',
+            reply_markup: { inline_keyboard: m.klavye },
+          });
+        }
       }
       return;
     }
