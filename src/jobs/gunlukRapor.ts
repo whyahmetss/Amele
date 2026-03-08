@@ -10,6 +10,27 @@ const standuplar: Record<number, { plan: string; tamamlanan: string[]; ad: strin
 
 export function gunlukRaporuBaslat(): void {
 
+  // Sabah 08:30 - Görev hatırlatması (3+ gündür açık görevler)
+  cron.schedule('30 8 * * 1-5', async () => {
+    try {
+      const sonuc = await db.query(`
+        SELECT id, metin, ekleyen_ad, olusturuldu
+        FROM gorevler
+        WHERE durum != 'tamamlandi' AND olusturuldu < NOW() - INTERVAL '3 days'
+        ORDER BY olusturuldu ASC
+      `);
+      if (sonuc.rows.length > 0) {
+        const satirlar = sonuc.rows.slice(0, 5).map((r: any) => `• #${r.id} ${r.metin} (${r.ekleyen_ad})`).join('\n');
+        const ek = sonuc.rows.length > 5 ? `\n_+${sonuc.rows.length - 5} görev daha_` : '';
+        await grupaMesajGonder(
+          `⏰ *Görev Hatırlatması*\n3+ gündür açık ${sonuc.rows.length} görev var:\n\n${satirlar}${ek}`
+        );
+      }
+    } catch (hata) {
+      logger.error('Görev hatırlatma hatası:', hata);
+    }
+  }, { timezone: 'Europe/Istanbul' });
+
   // Sabah 09:00 - Günlük rapor
   cron.schedule('0 9 * * 1-5', async () => {
     logger.info('Günlük rapor hazırlanıyor...');
@@ -62,7 +83,7 @@ export function gunlukRaporuBaslat(): void {
     await grupaMesajGonder(metin);
   }, { timezone: 'Europe/Istanbul' });
 
-  // Her Pazar 20:00 - Haftalık özet
+  // Her Pazar 20:00 - Haftalık özet + Proaktif AI önerisi
   cron.schedule('0 20 * * 0', async () => {
     try {
       const sonuc = await db.query(`
@@ -75,6 +96,14 @@ export function gunlukRaporuBaslat(): void {
       `);
       const v = sonuc.rows[0];
 
+      const ozet = `✅ Tamamlanan: ${v.tamamlanan} | 🐞 Bug: ${v.buglar} | 🚀 Deploy: ${v.deployler} | 📌 Bekleyen: ${v.bekleyen}`;
+      let aiOneri = '';
+      try {
+        aiOneri = await claudeSor(
+          `Haftalık geliştirme özeti: ${ozet}. Bu veriye göre 2-3 cümleyle kısa bir değerlendirme ve öneri yaz. Örn: "Frontend yoğun, backend'e görev dağıtılabilir" gibi.`
+        );
+      } catch {}
+
       await grupaMesajGonder(
         `📆 *Haftalık Özet*\n━━━━━━━━━━━━━━━━━━━━━━\n\n` +
         `✅ Tamamlanan Görev: ${v.tamamlanan}\n` +
@@ -82,6 +111,7 @@ export function gunlukRaporuBaslat(): void {
         `🚀 Deploy: ${v.deployler}\n` +
         `⚠️ Hata: ${v.hatalar}\n` +
         `📌 Hala Bekleyen: ${v.bekleyen}\n\n` +
+        (aiOneri ? `🤖 *AI Önerisi:*\n${aiOneri}\n\n` : '') +
         `━━━━━━━━━━━━━━━━━━━━━━\n` +
         `_Haftalık rapor · UstaGo Bot_`
       );
@@ -110,4 +140,11 @@ export function standupTamamlananEkle(kullaniciId: number, tamamlanan: string): 
 
 export function standupGetir(kullaniciId: number) {
   return standuplar[kullaniciId] || null;
+}
+
+export function standupBugunTumunuGetir(): Array<{ ad: string; plan: string; tamamlanan: string[] }> {
+  const bugun = new Date().toDateString();
+  return Object.values(standuplar)
+    .filter((s) => s.tarih.toDateString() === bugun)
+    .map((s) => ({ ad: s.ad, plan: s.plan, tamamlanan: s.tamamlanan }));
 }

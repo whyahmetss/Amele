@@ -61,6 +61,16 @@ CREATE INDEX IF NOT EXISTS idx_gorevler_durum ON gorevler(durum);
 CREATE INDEX IF NOT EXISTS idx_deployler_tarih ON deployler(olusturuldu DESC);
 CREATE INDEX IF NOT EXISTS idx_hatalar_tarih ON hata_loglari(olusturuldu DESC);
 CREATE INDEX IF NOT EXISTS idx_buglar_durum ON bug_raporlari(durum);
+
+-- Nöbet takvimi tablosu
+CREATE TABLE IF NOT EXISTS nobet_takvimi (
+  id            SERIAL PRIMARY KEY,
+  kullanici_id  BIGINT NOT NULL,
+  kullanici_ad  VARCHAR(100),
+  tarih         DATE NOT NULL UNIQUE,
+  olusturuldu   TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_nobet_tarih ON nobet_takvimi(tarih);
 `;
 
 async function migrate() {

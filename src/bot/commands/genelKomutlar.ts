@@ -1,11 +1,14 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { gorevService } from '../../services/gorevService';
+import { bugService } from '../../services/bugService';
 import { db } from '../../models/database';
 import { redis } from '../../models/redis';
 import { deployService } from '../../services/deployService';
 import { servisleriGetir } from '../../services/renderIzleme';
 import { claudeSor } from '../../integrations/claudeAI';
-import { standupGetir } from '../../jobs/gunlukRapor';
+import { standupGetir, standupBugunTumunuGetir } from '../../jobs/gunlukRapor';
+import { nobetService } from '../../services/nobetService';
+import { issueOlustur } from '../../services/githubService';
 import { adminMi } from '../middlewares/auth';
 import { logger } from '../../utils/logger';
 import { exec } from 'child_process';
@@ -22,7 +25,11 @@ const YARDIM_METNI =
 
 const INLINE_KEYBOARD: TelegramBot.InlineKeyboardButton[][] = [
   [
+    { text: '☀️ Bugün Ne Var?', callback_data: 'cmd:bugun_ne_var' },
+  ],
+  [
     { text: '📋 Görev Listesi', callback_data: 'cmd:gorev_liste' },
+    { text: '📊 İstatistik', callback_data: 'cmd:gorev_istatistik' },
   ],
   [
     { text: '➕ Görev Ekle', callback_data: 'cmd:gorev_ekle' },
@@ -36,7 +43,11 @@ const INLINE_KEYBOARD: TelegramBot.InlineKeyboardButton[][] = [
   [
     { text: '📋 Standup', callback_data: 'cmd:standup' },
     { text: '📝 Changelog', callback_data: 'cmd:changelog' },
+    { text: '🔄 Retro', callback_data: 'cmd:retro' },
     { text: '🖥 Servisler', callback_data: 'cmd:servisler' },
+  ],
+  [
+    { text: '👮 Nöbet', callback_data: 'cmd:nobet' },
   ],
   [
     { text: '📈 Sinyal LONG', callback_data: 'cmd:sinyal_long' },
@@ -66,25 +77,64 @@ export function genelKomutlariniKaydet(bot: TelegramBot): void {
   // Buton tıklamaları
   bot.on('callback_query', async (callback) => {
     const data = callback.data;
-    if (!data?.startsWith('cmd:')) return;
+    if (!data) return;
 
     const chatId = callback.message?.chat?.id;
     const userId = callback.from?.id;
     if (!chatId) return;
 
-    const cmd = data.replace('cmd:', '');
     await bot.answerCallbackQuery(callback.id);
+
+    // GitHub issue oluştur
+    if (data.startsWith('github:')) {
+      const [, tip, idStr] = data.split(':');
+      const ghId = parseInt(idStr || '0');
+      if (!chatId || !ghId) return;
+      try {
+        if (tip === 'gorev') {
+          const r = await db.query<{ metin: string; ekleyen_ad: string }>('SELECT metin, ekleyen_ad FROM gorevler WHERE id = $1', [ghId]);
+          const g = r.rows[0];
+          if (g) {
+            const sonuc = await issueOlustur(`[Görev #${ghId}] ${g.metin}`, `Görev: ${g.metin}\n\nEkleyen: ${g.ekleyen_ad}`);
+            await bot.sendMessage(chatId, sonuc.url ? `✅ GitHub issue: ${sonuc.url}` : `❌ ${sonuc.hata}`);
+          }
+        } else if (tip === 'bug') {
+          const r = await db.query<{ aciklama: string; bildiren_ad: string }>('SELECT aciklama, bildiren_ad FROM bug_raporlari WHERE id = $1', [ghId]);
+          const b = r.rows[0];
+          if (b) {
+            const sonuc = await issueOlustur(`[Bug #${ghId}] ${b.aciklama}`, `Bug: ${b.aciklama}\n\nBildiren: ${b.bildiren_ad}`, ['bug']);
+            await bot.sendMessage(chatId, sonuc.url ? `✅ GitHub issue: ${sonuc.url}` : `❌ ${sonuc.hata}`);
+          }
+        }
+      } catch (hata) {
+        logger.error('GitHub buton hatası:', hata);
+        await bot.sendMessage(chatId, '❌ GitHub issue oluşturulamadı.');
+      }
+      return;
+    }
+
+    if (!data.startsWith('cmd:')) return;
+
+    const cmd = data.replace('cmd:', '');
 
     try {
       switch (cmd) {
+        case 'bugun_ne_var':
+          await bugunNeVarCalistir(bot, chatId);
+          break;
         case 'gorev_liste': {
           const gorevler = await gorevService.liste();
           const metin = gorevService.formatListeMesaji(gorevler);
           await bot.sendMessage(chatId, metin, { parse_mode: 'Markdown' });
           break;
         }
+        case 'gorev_istatistik': {
+          const { satirlar } = await gorevService.istatistik();
+          await bot.sendMessage(chatId, satirlar, { parse_mode: 'Markdown' });
+          break;
+        }
         case 'gorev_ekle':
-          await bot.sendMessage(chatId, '📝 Görev eklemek için:\n`/gorev ekle <metin>`\n\nÖrn: `/gorev ekle Login API düzelt`', { parse_mode: 'Markdown' });
+          await bot.sendMessage(chatId, '📝 Görev eklemek için:\n`/gorev ekle <metin>`\n`/gorev dogal Yarın Login düzelt` (AI parse)\n\nVeya mesaja yanıt verip `gorev` yazın.', { parse_mode: 'Markdown' });
           break;
         case 'gorev_bitir':
           await bot.sendMessage(chatId, '✓ Görev bitirmek için:\n`/gorev bitir <id>`\n\nÖrn: `/gorev bitir 3`', { parse_mode: 'Markdown' });
@@ -122,9 +172,21 @@ export function genelKomutlariniKaydet(bot: TelegramBot): void {
         case 'changelog':
           await ekstraChangelogCalistir(bot, chatId);
           break;
+        case 'retro':
+          await retroCalistir(bot, chatId);
+          break;
         case 'servisler':
           await ekstraServislerCalistir(bot, chatId);
           break;
+        case 'nobet': {
+          const nobet = await nobetService.bugunGetir();
+          if (!nobet) {
+            await bot.sendMessage(chatId, '📅 Bugün için nöbet atanmamış.');
+          } else {
+            await bot.sendMessage(chatId, `👮 *Bugünkü Nöbetçi*\n\n🕐 ${nobet.tarih}\n👤 ${nobet.kullanici_ad}`, { parse_mode: 'Markdown' });
+          }
+          break;
+        }
         case 'server_durum':
         case 'server_saglik':
         case 'server_log':
@@ -221,6 +283,49 @@ async function sunucuKomutCalistir(bot: TelegramBot, chatId: number, cmd: string
   }
 }
 
+async function bugunNeVarCalistir(bot: TelegramBot, chatId: number): Promise<void> {
+  try {
+    const [gorevler, buglar, standuplar, nobet] = await Promise.all([
+      gorevService.liste(),
+      bugService.liste(),
+      Promise.resolve(standupBugunTumunuGetir()),
+      nobetService.bugunGetir(),
+    ]);
+
+    let metin = `☀️ *Bugün Ne Var?*\n━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    metin += `📋 *Aktif Görevler:* ${gorevler.length}\n`;
+    if (gorevler.length) {
+      gorevler.slice(0, 3).forEach((g) => {
+        metin += `   • #${g.id} ${g.metin}\n`;
+      });
+      if (gorevler.length > 3) metin += `   _+${gorevler.length - 3} daha_\n`;
+    }
+
+    metin += `\n🐞 *Açık Buglar:* ${buglar.length}\n`;
+    if (buglar.length) {
+        buglar.slice(0, 2).forEach((b: { id: number; aciklama: string }) => {
+          const a = (b.aciklama || '').slice(0, 40);
+          metin += `   • #${b.id} ${a}${(b.aciklama || '').length > 40 ? '...' : ''}\n`;
+        });
+    }
+
+    metin += `\n📋 *Standup:* ${standuplar.length} kişi\n`;
+    standuplar.forEach((s) => {
+      const p = (s.plan || '').slice(0, 50);
+      metin += `   • ${s.ad}: ${p}${(s.plan || '').length > 50 ? '...' : ''}\n`;
+    });
+
+    if (nobet) {
+      metin += `\n👮 *Nöbetçi:* ${nobet.kullanici_ad}\n`;
+    }
+    metin += `\n━━━━━━━━━━━━━━━━━━━━━━`;
+    await bot.sendMessage(chatId, metin, { parse_mode: 'Markdown' });
+  } catch (hata) {
+    logger.error('Bugün ne var hatası:', hata);
+    await bot.sendMessage(chatId, '❌ Özet alınamadı.');
+  }
+}
+
 async function ekstraChangelogCalistir(bot: TelegramBot, chatId: number): Promise<void> {
   try {
     await bot.sendMessage(chatId, '📝 Changelog hazırlanıyor...');
@@ -254,6 +359,29 @@ async function ekstraChangelogCalistir(bot: TelegramBot, chatId: number): Promis
   } catch (hata) {
     logger.error('Changelog hatası:', hata);
     await bot.sendMessage(chatId, '❌ Changelog alınamadı.');
+  }
+}
+
+async function retroCalistir(bot: TelegramBot, chatId: number): Promise<void> {
+  try {
+    await bot.sendMessage(chatId, '🔄 Retrospektif hazırlanıyor...');
+    const [gorevler, buglar, deployler] = await Promise.all([
+      db.query(`SELECT metin, ekleyen_ad FROM gorevler WHERE tamamlandi >= NOW() - INTERVAL '7 days'`),
+      db.query(`SELECT aciklama, durum, bildiren_ad FROM bug_raporlari WHERE olusturuldu >= NOW() - INTERVAL '7 days'`),
+      db.query(`SELECT commit_msg, yapan FROM deployler WHERE olusturuldu >= NOW() - INTERVAL '7 days' LIMIT 10`),
+    ]);
+    const ozet = [
+      'Tamamlanan: ' + gorevler.rows.map((r: any) => r.metin).join('; '),
+      'Buglar: ' + buglar.rows.map((r: any) => r.aciklama + ' [' + r.durum + ']').join('; '),
+      'Deploylar: ' + deployler.rows.map((r: any) => r.commit_msg).join('; '),
+    ].join('\n');
+    const analiz = await claudeSor(
+      `Son 1 haftalık sprint verisi. Retrospektif: 1) Ne iyi gitti? 2) Ne geliştirilebilir? 3) 2-3 aksiyon öner. Kısa ve net ol.\n\n${ozet}`
+    );
+    await bot.sendMessage(chatId, `📋 *Sprint Retrospektifi*\n━━━━━━━━━━━━━━━━━━━━━━\n\n${analiz}`, { parse_mode: 'Markdown' });
+  } catch (hata) {
+    logger.error('Retro hatası:', hata);
+    await bot.sendMessage(chatId, '❌ Retrospektif oluşturulamadı.');
   }
 }
 
