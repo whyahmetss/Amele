@@ -11,6 +11,9 @@ class Veritabani {
       max: 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
+      ssl: {
+    rejectUnauthorized: false // Supabase bağlantısı için bu şart kanka
+  }
     });
 
     this.pool.on('error', (hata) => {
