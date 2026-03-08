@@ -7,6 +7,7 @@ import { gorevKomutlariniKaydet } from './commands/gorevKomutlari';
 import { sunucuKomutlariniKaydet } from './commands/sunucuKomutlari';
 import { aiKomutlariniKaydet } from './commands/aiKomutlari';
 import { isimHandleriniKaydet } from './handlers/isimHandler';
+import { ekstraKomutlariniKaydet } from './commands/ekstraKomutlar';
 
 let botInstance: TelegramBot | null = null;
 
@@ -24,7 +25,8 @@ export function botOlustur(): TelegramBot {
   gorevKomutlariniKaydet(bot);
   sunucuKomutlariniKaydet(bot);
   aiKomutlariniKaydet(bot);
-  isimHandleriniKaydet(bot); // "amele naber" tetikleyici
+  isimHandleriniKaydet(bot);
+  ekstraKomutlariniKaydet(bot); // "amele naber" tetikleyici
 
   bot.on('polling_error', (hata) => logger.error('Telegram polling hatası:', hata));
   bot.on('error', (hata) => logger.error('Telegram bot hatası:', hata));
