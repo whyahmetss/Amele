@@ -85,4 +85,34 @@ export function gorevKomutlariniKaydet(bot: TelegramBot): void {
       bot.sendMessage(mesaj.chat.id, '❌ Görev silinemedi.');
     }
   });
+
+  // /sprint - Deepseek ile görev analizi
+  bot.onText(/^\/sprint/i, async (mesaj) => {
+    try {
+      const gorevler = await gorevService.liste();
+      if (!gorevler.length) {
+        bot.sendMessage(mesaj.chat.id, '📋 Aktif görev yok.');
+        return;
+      }
+
+      bot.sendMessage(mesaj.chat.id, '🤖 Görevler analiz ediliyor...');
+
+      const gorevListesi = gorevler.map((g: any) => `#${g.id}: ${g.metin}`).join('\n');
+
+      const { claudeSor } = await import('../../integrations/claudeAI');
+      const analiz = await claudeSor(
+        `UstaGo projesi için aşağıdaki görevleri analiz et. Önceliklendirme yap, tahmini süre ver, varsa bağımlılıkları belirt. Kısa ve net ol:\n\n${gorevListesi}`
+      );
+
+      bot.sendMessage(
+        mesaj.chat.id,
+        `🚀 *Sprint Analizi*\n\n${analiz}`,
+        { parse_mode: 'Markdown' }
+      );
+    } catch (hata) {
+      logger.error('Sprint hatası:', hata);
+      bot.sendMessage(mesaj.chat.id, '❌ Sprint analizi yapılamadı.');
+    }
+  });
 }
+// Bu satırı sil - append düzgün çalışmıyor
