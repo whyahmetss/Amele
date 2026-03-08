@@ -1,0 +1,108 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ekstraKomutlariniKaydet = ekstraKomutlariniKaydet;
+const claudeAI_1 = require("../../integrations/claudeAI");
+const database_1 = require("../../models/database");
+const logger_1 = require("../../utils/logger");
+const gunlukRapor_1 = require("../../jobs/gunlukRapor");
+const renderIzleme_1 = require("../../services/renderIzleme");
+function ekstraKomutlariniKaydet(bot) {
+    // /standup <plan>  veya  /standup bitti <ne yaptın>
+    bot.onText(/^\/standup bitti (.+)/i, async (mesaj, eslesme) => {
+        const uid = mesaj.from?.id || 0;
+        const tamamlanan = eslesme?.[1]?.trim() || '';
+        const eklendi = (0, gunlukRapor_1.standupTamamlananEkle)(uid, tamamlanan);
+        if (!eklendi) {
+            bot.sendMessage(mesaj.chat.id, '⚠️ Önce `/standup <planın>` ile standup başlat.', { parse_mode: 'Markdown' });
+            return;
+        }
+        bot.sendMessage(mesaj.chat.id, `✅ Tamamlanan kaydedildi: _${tamamlanan}_\nAkşam 18:00'de özet gönderilecek.`, { parse_mode: 'Markdown' });
+    });
+    bot.onText(/^\/standup(?! bitti)(.*)$/i, async (mesaj, eslesme) => {
+        const uid = mesaj.from?.id || 0;
+        const ad = mesaj.from?.first_name || 'Bilinmeyen';
+        const plan = eslesme?.[1]?.trim();
+        if (!plan) {
+            const mevcut = (0, gunlukRapor_1.standupGetir)(uid);
+            if (mevcut) {
+                bot.sendMessage(mesaj.chat.id, `📋 *Bugünkü Standup'ın*\n\n` +
+                    `📌 Plan: ${mevcut.plan}\n` +
+                    `✅ Tamamlanan: ${mevcut.tamamlanan.join(', ') || 'Henüz yok'}\n\n` +
+                    `Tamamlanan eklemek için: \`/standup bitti <ne yaptın>\``, { parse_mode: 'Markdown' });
+            }
+            else {
+                bot.sendMessage(mesaj.chat.id, '📝 Kullanım:\n`/standup bugün ne yapacaksın`\n`/standup bitti ne yaptın`', { parse_mode: 'Markdown' });
+            }
+            return;
+        }
+        (0, gunlukRapor_1.standupKaydet)(uid, ad, plan);
+        bot.sendMessage(mesaj.chat.id, `✅ *Standup kaydedildi!*\n\n👤 ${ad}\n📋 Plan: ${plan}\n\nAkşam 18:00'de özet gönderilecek 🕕`, { parse_mode: 'Markdown' });
+    });
+    // /changelog - son commitler + Deepseek özeti
+    bot.onText(/^\/changelog/i, async (mesaj) => {
+        bot.sendMessage(mesaj.chat.id, '📝 Changelog hazırlanıyor...');
+        try {
+            const sonuc = await database_1.db.query(`
+        SELECT proje, branch, commit_msg, yapan, olusturuldu
+        FROM deployler
+        ORDER BY olusturuldu DESC
+        LIMIT 10
+      `);
+            if (!sonuc.rows.length) {
+                bot.sendMessage(mesaj.chat.id, '📭 Henüz deploy kaydı yok.');
+                return;
+            }
+            const commitListesi = sonuc.rows.map((r, i) => {
+                const tarih = new Date(r.olusturuldu).toLocaleDateString('tr-TR');
+                return `${i + 1}. [${tarih}] ${r.proje}/${r.branch}: ${r.commit_msg} (${r.yapan})`;
+            }).join('\n');
+            const analiz = await (0, claudeAI_1.claudeSor)(`Aşağıdaki son commit geçmişini analiz et. Ne tür değişiklikler yapıldı? Önemli gelişmeler var mı? Kısa özet yaz:\n\n${commitListesi}`);
+            bot.sendMessage(mesaj.chat.id, `📝 *Changelog & Analiz*\n━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+                `*Son Commitler:*\n\`\`\`\n${commitListesi}\n\`\`\`\n\n` +
+                `🤖 *AI Özeti:*\n${analiz}`, { parse_mode: 'Markdown' });
+        }
+        catch (hata) {
+            logger_1.logger.error('Changelog hatası:', hata);
+            bot.sendMessage(mesaj.chat.id, '❌ Changelog alınamadı.');
+        }
+    });
+    // /retro - Sprint retrospektifi
+    bot.onText(/^\/retro/i, async (mesaj) => {
+        bot.sendMessage(mesaj.chat.id, '🔄 Retrospektif hazırlanıyor...');
+        try {
+            const [gorevler, buglar, deployler] = await Promise.all([
+                database_1.db.query(`SELECT metin, tamamlandi, ekleyen_ad FROM gorevler WHERE tamamlandi >= NOW() - INTERVAL '7 days'`),
+                database_1.db.query(`SELECT aciklama, durum, bildiren_ad FROM bug_raporlari WHERE olusturuldu >= NOW() - INTERVAL '7 days'`),
+                database_1.db.query(`SELECT commit_msg, yapan FROM deployler WHERE olusturuldu >= NOW() - INTERVAL '7 days' LIMIT 10`),
+            ]);
+            const ozet = [
+                '**Tamamlanan görevler:**',
+                gorevler.rows.map((r) => `- ${r.metin} (${r.ekleyen_ad})`).join('\n') || '-',
+                '\n**Buglar:**',
+                buglar.rows.map((r) => `- ${r.aciklama} [${r.durum}]`).join('\n') || '-',
+                '\n**Son deploylar:**',
+                deployler.rows.map((r) => `- ${r.commit_msg}`).join('\n') || '-',
+            ].join('\n');
+            const analiz = await (0, claudeAI_1.claudeSor)(`Aşağıdaki son 1 haftalık sprint verisini analiz et. Retrospektif formatında yanıt ver:\n\n` +
+                `1. Ne iyi gitti?\n2. Ne geliştirilebilir?\n3. Bir sonraki sprint için 2-3 aksiyon öner.\n\nKısa ve net ol.\n\nVeri:\n${ozet}`);
+            bot.sendMessage(mesaj.chat.id, `📋 *Sprint Retrospektifi*\n━━━━━━━━━━━━━━━━━━━━━━\n\n${analiz}`, { parse_mode: 'Markdown' });
+        }
+        catch (hata) {
+            logger_1.logger.error('Retro hatası:', hata);
+            bot.sendMessage(mesaj.chat.id, '❌ Retrospektif oluşturulamadı.');
+        }
+    });
+    // /servisler - manuel servis durumu
+    bot.onText(/^\/servisler/i, async (mesaj) => {
+        const servisler = (0, renderIzleme_1.servisleriGetir)();
+        let metin = `🖥️ *Servis Durumu*\n━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+        for (const s of servisler) {
+            const durum = s.sonDurum === null ? '⏳ Kontrol edilmedi' : s.sonDurum ? '🟢 Çevrimiçi' : '🔴 Çevrimdışı';
+            const kontrol = s.sonKontrol ? new Date(s.sonKontrol).toLocaleTimeString('tr-TR') : '-';
+            metin += `${durum} *${s.ad}*\nSon kontrol: ${kontrol}\n\n`;
+        }
+        metin += `_Her 5 dakikada otomatik kontrol edilir_`;
+        bot.sendMessage(mesaj.chat.id, metin, { parse_mode: 'Markdown' });
+    });
+}
+//# sourceMappingURL=ekstraKomutlar.js.map
