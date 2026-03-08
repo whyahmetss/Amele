@@ -13,8 +13,8 @@ export const config = {
   redis: {
     url: process.env.REDIS_URL || 'redis://localhost:6379',
   },
-  claude: {
-    apiKey: process.env.CLAUDE_API_KEY || '',
+  deepseek: {
+    apiKey: process.env.DEEPSEEK_API_KEY || '',
   },
   github: {
     webhookSecret: process.env.GITHUB_WEBHOOK_SECRET || '',
