@@ -6,6 +6,7 @@ import { genelKomutlariniKaydet } from './commands/genelKomutlar';
 import { gorevKomutlariniKaydet } from './commands/gorevKomutlari';
 import { sunucuKomutlariniKaydet } from './commands/sunucuKomutlari';
 import { aiKomutlariniKaydet } from './commands/aiKomutlari';
+import { isimHandleriniKaydet } from './handlers/isimHandler';
 
 let botInstance: TelegramBot | null = null;
 
@@ -14,26 +15,19 @@ export function botOlustur(): TelegramBot {
 
   const bot = new TelegramBot(config.telegram.token, { polling: true });
 
-  // Rate limiting - tüm mesajlar için
   bot.on('message', async (mesaj) => {
     if (!mesaj.text?.startsWith('/')) return;
     await rateLimiter(bot, mesaj);
   });
 
-  // Komutları kaydet
   genelKomutlariniKaydet(bot);
   gorevKomutlariniKaydet(bot);
   sunucuKomutlariniKaydet(bot);
   aiKomutlariniKaydet(bot);
+  isimHandleriniKaydet(bot); // "amele naber" tetikleyici
 
-  // Hata yakalama
-  bot.on('polling_error', (hata) => {
-    logger.error('Telegram polling hatası:', hata);
-  });
-
-  bot.on('error', (hata) => {
-    logger.error('Telegram bot hatası:', hata);
-  });
+  bot.on('polling_error', (hata) => logger.error('Telegram polling hatası:', hata));
+  bot.on('error', (hata) => logger.error('Telegram bot hatası:', hata));
 
   logger.info('✅ Telegram botu başlatıldı');
   botInstance = bot;
@@ -44,15 +38,9 @@ export function botAl(): TelegramBot | null {
   return botInstance;
 }
 
-/**
- * Gruba mesaj gönder (servislerden çağrılabilir)
- */
 export async function grupaMesajGonder(metin: string, parseMode: 'Markdown' | 'HTML' = 'Markdown'): Promise<void> {
   const bot = botAl();
-  if (!bot) {
-    logger.warn('Bot başlatılmamış, mesaj gönderilemedi');
-    return;
-  }
+  if (!bot) return;
   try {
     await bot.sendMessage(config.telegram.chatId, metin, { parse_mode: parseMode });
   } catch (hata) {
