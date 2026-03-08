@@ -14,6 +14,8 @@ import * as awaitingState from '../utils/awaitingState';
 import { logger } from '../../utils/logger';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import fs from 'fs';
+import path from 'path';
 
 const execAsync = promisify(exec);
 
@@ -33,7 +35,7 @@ const MENU_KEYBOARDS: Record<string, { metin: string; klavye: TelegramBot.Inline
     klavye: [
       [{ text: '➕ Görev ekle', callback_data: 'cmd:gorev_ekle' }, { text: '📋 Görev liste', callback_data: 'cmd:gorev_liste' }],
       [{ text: '✓ Görev bitir', callback_data: 'cmd:gorev_bitir' }, { text: '🗑 Görev sil', callback_data: 'cmd:gorev_sil' }],
-      [{ text: '📊 İstatistik', callback_data: 'cmd:gorev_istatistik' }],
+      [{ text: '📊 İstatistik', callback_data: 'cmd:gorev_istatistik' }, { text: '📤 Dışa aktar', callback_data: 'cmd:gorev_export' }],
       [{ text: '← Ana menü', callback_data: 'menu:main' }],
     ],
   },
@@ -164,6 +166,25 @@ export function genelKomutlariniKaydet(bot: TelegramBot): void {
         case 'gorev_istatistik': {
           const { satirlar } = await gorevService.istatistik();
           await bot.sendMessage(chatId, satirlar, { parse_mode: 'Markdown' });
+          break;
+        }
+        case 'gorev_export': {
+          try {
+            const md = await gorevService.exportMarkdown();
+            const dosyaAdi = `gorevler-${new Date().toISOString().slice(0, 10)}.md`;
+            const dosyaYolu = path.join(process.cwd(), 'exports', dosyaAdi);
+            fs.mkdirSync(path.join(process.cwd(), 'exports'), { recursive: true });
+            fs.writeFileSync(dosyaYolu, md, 'utf-8');
+            await bot.sendDocument(chatId, dosyaYolu, {
+              caption: '📤 _Projeye koy veya Cursor\'da @ ile aç, bana yapıştır_',
+              parse_mode: 'Markdown',
+            });
+            try { fs.unlinkSync(dosyaYolu); } catch {}
+          } catch (hata) {
+            logger.error('Görev export hatası:', hata);
+            const md = await gorevService.exportMarkdown();
+            await bot.sendMessage(chatId, `📤 *Görev Listesi*\n\n\`\`\`markdown\n${md}\`\`\`\n\n_Yukarıdaki metni kopyala, Cursor\'da bana yapıştır_`, { parse_mode: 'Markdown' });
+          }
           break;
         }
         case 'gorev_ekle':
